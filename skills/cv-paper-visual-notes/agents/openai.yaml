@@ -1,0 +1,4 @@
+interface:
+  display_name: "CV Paper Visual Notes"
+  short_description: "Original figures, technical insight, and reading notes"
+  default_prompt: "Use $cv-paper-visual-notes to explain this computer vision paper clearly using original figures, side-by-side method comparisons, technical details, ablations, limitations, creative extensions, and editable notes."

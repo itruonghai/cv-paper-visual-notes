@@ -1,0 +1,15 @@
+__pycache__/
+*.py[cod]
+.DS_Store
+.venv/
+.runtime/
+node_modules/
+runtime.local.json
+.env
+.env.*
+work/
+outputs/
+papers/
+skill-backups/
+*.pdf
+*.zip

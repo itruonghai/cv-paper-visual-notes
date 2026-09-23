@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="{{LANGUAGE}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{{TITLE}} · {{UI_PAGE_SUFFIX}}</title>
+<style>
+.table-scroll table{min-width:560px;overflow-wrap:normal}
+.table-scroll .comparison-table{min-width:820px;table-layout:fixed}
+.comparison-table th:first-child{width:20%}
+.comparison-table figure{margin:0;padding:10px}
+.comparison-table th[scope="row"]{font-weight:650}
+.comparison-table td>p:first-child{margin-top:0}
+.comparison-takeaway{font-size:18px}
+:root{color-scheme:light;--ink:#172c38;--muted:#51636d;--line:#d7e1e3;--accent:#176354;--paper:#fff;--wash:#f3f6f4}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:24px}body{margin:0;background:var(--wash);color:var(--ink);font:17px/1.65 system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:var(--accent);text-underline-offset:3px}button,.file-label{font:inherit;border:1px solid var(--line);background:white;border-radius:7px;padding:8px 13px;cursor:pointer;color:var(--ink)}button:hover,.file-label:hover{border-color:var(--accent)}button:focus-visible,a:focus-visible,textarea:focus-visible,summary:focus-visible,.file-label:focus-within{outline:3px solid #87bcb0;outline-offset:3px}.layout{max-width:1460px;margin:auto;padding:38px 32px;display:grid;grid-template-columns:220px minmax(0,1fr);gap:38px}aside{position:sticky;top:28px;align-self:start;font-size:14px;max-height:90vh;overflow:auto}.eyebrow{font-size:12px;font-weight:750;letter-spacing:.15em;text-transform:uppercase;color:var(--accent)}nav{display:grid;gap:7px;margin-top:20px}nav a{padding:8px 10px;text-decoration:none;border-left:2px solid var(--line)}nav a:hover{border-color:var(--accent);background:#e9f0ed}main{min-width:0}header{padding:14px 0 28px}h1{font-size:clamp(28px,3.5vw,46px);line-height:1.14;letter-spacing:-.035em;max-width:1050px;margin:13px 0 20px}h2{font-size:27px;line-height:1.25;letter-spacing:-.02em;margin:0 0 20px}h3{font-size:20px;line-height:1.35}.summary{font-size:20px;max-width:850px;color:#334b55}.meta{font-size:14px;color:var(--muted)}.chapter{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:30px;margin-bottom:24px;overflow-wrap:anywhere}.chapter>p,.chapter>ul,.chapter>ol{max-width:900px}figure{margin:28px 0;padding:16px;border:1px solid var(--line);border-radius:9px;background:#fff}figure img{display:block;width:100%;height:auto;object-fit:contain;cursor:zoom-in}figcaption{margin-top:14px;color:var(--muted);font-size:14px;line-height:1.5}figure::after{content:attr(data-enlarge-hint);display:block;color:var(--accent);font-size:12px;margin-top:7px}details{border-top:1px solid var(--line);margin-top:20px;padding-top:16px}summary{cursor:pointer;color:var(--accent);font-weight:650}details[open]>summary{margin-bottom:16px}.callout{border-left:4px solid var(--accent);background:#f1f7f4;padding:14px 18px;margin:18px 0}.table-scroll{overflow:auto}table{border-collapse:collapse;width:100%;font-size:15px}th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left;vertical-align:top}th{background:#f3f7f5}code{font-size:.9em;background:#f0f3f3;padding:2px 4px;border-radius:3px}pre{overflow:auto;padding:16px;background:#f3f5f6}pre code{background:none;padding:0}.note-controls{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0}.file-label{display:inline-block}.file-label input{position:absolute;width:1px;height:1px;opacity:0}textarea{display:block;width:100%;min-height:480px;resize:vertical;font:15px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace;color:var(--ink);border:1px solid #aebfc3;border-radius:8px;padding:18px;background:#fff}.status{font-size:13px;color:var(--muted)}.conflict{border:1px solid #dcba80;background:#fff8e9;padding:15px;border-radius:8px;margin:12px 0}.snapshot{white-space:pre-wrap;max-height:320px;overflow:auto}.hidden{display:none!important}dialog{border:1px solid var(--line);border-radius:10px;padding:18px;max-width:96vw;max-height:94vh;width:1400px;background:white}dialog::backdrop{background:#132731c9}.zoom-toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;position:sticky;top:0;background:white;padding-bottom:10px}.zoom-scroll{overflow:auto;max-height:76vh}.zoom-scroll img{display:block;width:100%;height:auto}.zoom-scroll img.actual{width:auto;max-width:none}#zoom-caption{font-size:14px;color:var(--muted)}footer{font-size:13px;color:var(--muted);margin:26px 0}
+@media(max-width:800px){.layout{grid-template-columns:1fr;padding:20px 14px;gap:10px}aside{position:static;max-height:none}nav{display:flex;overflow:auto;gap:5px;margin:10px 0}nav a{white-space:nowrap;border-left:0;border-bottom:2px solid var(--line);padding:7px}.chapter{padding:20px 16px}figure{padding:8px}h2{font-size:24px}.summary{font-size:18px}.note-controls{gap:7px}button,.file-label{font-size:14px}}
+@media print{aside,.note-controls,.status,.conflict,dialog,footer{display:none!important}.layout{display:block;padding:0}.chapter{border:0;padding:12px 0;break-inside:auto}figure{break-inside:avoid}figure::after{display:none}body{background:white;font-size:11pt}h1{font-size:26pt}details{display:block}textarea{min-height:250px}}
+</style>
+</head>
+<body>
+<div class="layout">
+<aside><div class="eyebrow">{{UI_BRAND}}</div><nav aria-label="{{UI_SECTIONS_LABEL}}">{{NAV}}<a href="#reader-notes">{{UI_MY_NOTES}}</a></nav></aside>
+<main>
+<header><div class="eyebrow">{{UI_OVERVIEW_LABEL}}</div><h1>{{TITLE}}</h1><p class="summary">{{SUMMARY}}</p><p class="meta">{{VERSION}} · {{SOURCE_LINK}}</p></header>
+{{CONTENT}}
+<section class="chapter" id="reader-notes">
+<div class="eyebrow">{{UI_READING_RECORD}}</div><h2>{{UI_NOTES_HEADING}}</h2>
+<p>{{UI_NOTES_INTRO}}</p>
+<p class="status">{{UI_DRAFT_NOTICE}}</p>
+<div id="conflict" class="conflict hidden" role="status">{{UI_CONFLICT_NOTICE}}<div class="note-controls"><button id="keep-draft" type="button">{{UI_KEEP_DRAFT}}</button><button id="use-file" type="button">{{UI_USE_FILE}}</button></div></div>
+<div class="note-controls">
+<button id="export-notes" type="button">{{UI_DOWNLOAD_NOTES}}</button>
+<label class="file-label">{{UI_IMPORT_NOTES}}<input id="import-notes" type="file" accept=".md,.txt,text/plain,text/markdown"></label>
+<button id="copy-question" type="button">{{UI_COPY_PROMPT}}</button>
+</div>
+<label for="notes-editor" class="status">{{UI_EDITOR_LABEL}}</label><textarea id="notes-editor" spellcheck="true"></textarea>
+<p id="save-status" class="status" aria-live="polite"></p>
+<p id="action-status" class="status" aria-live="polite"></p>
+<details id="previous-panel" class="hidden"><summary>{{UI_PREVIOUS_HEADING}}</summary><pre id="previous-text" class="snapshot"></pre><button id="download-previous" type="button">{{UI_DOWNLOAD_PREVIOUS}}</button></details>
+<details><summary>{{UI_SNAPSHOT_HEADING}}</summary><p class="status">{{UI_SNAPSHOT_DESCRIPTION}}</p><pre id="notes-snapshot" class="snapshot"></pre><button id="export-snapshot" type="button">{{UI_DOWNLOAD_SNAPSHOT}}</button></details>
+<details id="discussion-prompt-panel"><summary>{{UI_PROMPT_HEADING}}</summary><pre id="discussion-prompt" class="snapshot"></pre></details>
+</section>
+<footer>{{UI_FOOTER}}</footer>
+</main></div>
+<dialog id="figure-dialog" aria-label="{{UI_ZOOM_LABEL}}"><div class="zoom-toolbar"><span>{{UI_ORIGINAL_FIGURE}}</span><div><button id="actual-size" type="button">{{UI_NATURAL_SIZE}}</button> <button id="close-figure" type="button">{{UI_CLOSE}}</button></div></div><div class="zoom-scroll"><img id="zoom-image" alt=""></div><p id="zoom-caption"></p></dialog>
+<script id="notebook-seed" type="application/json">{{SEED}}</script>
+<script>
+(() => {
+  const seed=JSON.parse(document.getElementById('notebook-seed').textContent);
+  const t=key=>seed.ui[key];
+  const editor=document.getElementById('notes-editor');
+  const status=document.getElementById('save-status');
+  const actionStatus=document.getElementById('action-status');
+  const conflict=document.getElementById('conflict');
+  const key='cv-paper-notes:'+JSON.stringify([seed.paperId,seed.version]);
+  let baseHash=seed.notesHash, storageAvailable=true, cached=null;
+  try { cached=JSON.parse(localStorage.getItem(key)||'null'); } catch (_) { storageAvailable=false; }
+  if(cached && typeof cached.text==='string') {
+    editor.value=cached.text;
+    baseHash=cached.text===seed.notes ? seed.notesHash : cached.baseHash;
+    conflict.classList.toggle('hidden',baseHash===seed.notesHash || cached.text===seed.notes);
+  } else { editor.value=seed.notes; }
+  document.getElementById('notes-snapshot').textContent=seed.notes;
+  status.textContent=storageAvailable ? (cached ? t('draft_restored') : t('file_loaded')) : t('storage_unavailable');
+  let previousText=typeof cached?.previousText==='string' ? cached.previousText : null;
+  function showPrevious(){
+    document.getElementById('previous-panel').classList.toggle('hidden',previousText===null);
+    document.getElementById('previous-text').textContent=previousText||'';
+  }
+  function resolveConflict(useFile){
+    if(useFile){previousText=editor.value;editor.value=seed.notes;showPrevious();}
+    baseHash=seed.notesHash;conflict.classList.add('hidden');saveDraft();updatePrompt();
+    actionStatus.textContent=t(useFile?'file_chosen':'draft_kept');
+  }
+  document.getElementById('keep-draft').addEventListener('click',()=>resolveConflict(false));
+  document.getElementById('use-file').addEventListener('click',()=>resolveConflict(true));
+  document.getElementById('download-previous').addEventListener('click',()=>download(previousText||'','notes-previous-draft.md'));
+  showPrevious();
+  function saveDraft() {
+    try { localStorage.setItem(key,JSON.stringify({text:editor.value,baseHash:baseHash,previousText:previousText,updatedAt:new Date().toISOString()})); status.textContent=t('draft_saved'); }
+    catch (_) { status.textContent=t('storage_unavailable'); }
+  }
+  function download(text,name) {
+    const url=URL.createObjectURL(new Blob([text],{type:'text/markdown;charset=utf-8'}));
+    const link=document.createElement('a');link.href=url;link.download=name;link.click();
+    setTimeout(()=>URL.revokeObjectURL(url),2000);
+  }
+  function discussionPrompt() {
+    return t('discussion_template').replace('{paper_id}',seed.paperId).replace('{version}',seed.version)+'\n\n'+editor.value;
+  }
+  function updatePrompt(){document.getElementById('discussion-prompt').textContent=discussionPrompt();}
+  editor.addEventListener('input',()=>{saveDraft();updatePrompt();});
+  document.getElementById('export-notes').addEventListener('click',()=>{download(editor.value,'notes.md');actionStatus.textContent=t('download_requested');});
+  document.getElementById('export-snapshot').addEventListener('click',()=>download(seed.notes,'notes-file-snapshot.md'));
+  document.getElementById('import-notes').addEventListener('change',async event=>{
+    const file=event.target.files[0];if(!file)return;
+    const text=await file.text();
+    if(text!==editor.value && !window.confirm(t('import_confirm'))){event.target.value='';return;}
+    editor.value=text;baseHash=seed.notesHash;conflict.classList.add('hidden');saveDraft();updatePrompt();event.target.value='';
+    actionStatus.textContent=t('imported');
+  });
+  document.getElementById('copy-question').addEventListener('click',async()=>{
+    updatePrompt();
+    try {await navigator.clipboard.writeText(discussionPrompt());actionStatus.textContent=t('prompt_copied');}
+    catch(_){document.getElementById('discussion-prompt-panel').open=true;actionStatus.textContent=t('copy_fallback');}
+  });
+  const dialog=document.getElementById('figure-dialog'),zoom=document.getElementById('zoom-image'),sizeButton=document.getElementById('actual-size');
+  document.querySelectorAll('figure img').forEach(img=>{
+    img.closest('figure').setAttribute('data-enlarge-hint',t('enlarge_hint'));
+    img.tabIndex=0;img.setAttribute('role','button');img.setAttribute('aria-label',t('enlarge_prefix')+img.alt);
+    function open(){zoom.src=img.src;zoom.alt=img.alt;zoom.classList.remove('actual');sizeButton.textContent=t('natural_size');document.getElementById('zoom-caption').textContent=img.closest('figure').querySelector('figcaption')?.textContent||'';dialog.showModal();}
+    img.addEventListener('click',open);img.addEventListener('keydown',event=>{if(event.key==='Enter'||event.key===' '){event.preventDefault();open();}});
+  });
+  sizeButton.addEventListener('click',()=>{const actual=zoom.classList.toggle('actual');sizeButton.textContent=actual?t('fit_view'):t('natural_size');});
+  document.getElementById('close-figure').addEventListener('click',()=>dialog.close());
+  updatePrompt();
+})();
+</script>
+</body>
+</html>
