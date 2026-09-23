@@ -5,6 +5,7 @@ Understand a computer vision paper through its **original figures**, a clear tec
 The skill creates a portable HTML reading notebook with:
 
 - Motivation, limitations of prior methods, novelty, and the actual method design.
+- Insights from official project pages, supplementary material, and accessible author explanation/demo videos, with source links and timestamps.
 - Original figures captured from the PDF at **200 DPI by default**, with higher resolution when needed.
 - **Side-by-side comparisons** of the target and relevant prior methods.
 - Ablations and diagnostics that explain model behavior, with controls and caveats.

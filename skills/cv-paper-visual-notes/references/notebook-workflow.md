@@ -15,6 +15,16 @@ assets/                Original figure and table crops; optional separate annota
 
 Keep downloaded PDFs and full-page working renders in a workspace `work/` directory or an existing source cache. Link to the source PDF as well as recording its exact version. Do not overwrite user notes when rebuilding. Different paper versions should have separate folders and explicit relationships.
 
+## Read the paper's companion material
+
+Check the authors' official project page as part of understanding the paper. Follow links from the PDF, arXiv/venue entry, official repository, or author website; if no link is supplied, make a focused search using the exact paper title. Confirm that the page belongs to the paper and its authors.
+
+- Read available supplementary PDFs/appendices for missing workflow details, extra ablations, qualitative results, and failure cases. Inspect relevant author slides, interactive demos, and explanation/demo videos when available. Match the depth to the question; prioritize material that resolves confusion or adds useful evidence.
+- Use project-page overviews and author explanations to make the motivation and high-level design easier to follow. Connect those insights to the actual method and original figures in the notebook. Companion figures, animations, or video stills can supplement the PDF figures, with their own attribution.
+- For video, use available playback/inspection tools or accessible frames and transcripts. Cite useful timestamps and state which parts were actually inspected. A transcript supports spoken explanation; it does not establish unseen visual behavior. If playback or the supplement is inaccessible, link it and state that limitation without claiming to have reviewed it.
+- Check version/date when available: a current project page or demo may describe a later revision. Identify discrepancies with the selected paper version. Treat demos as qualitative illustrations and keep promotional or explanatory claims distinct from measured experimental evidence.
+- Incorporate useful findings into the motivation, workflow, and experiment discussions. Include a short set of companion-resource links, and record consulted resources in `sources.json` under a `resources` list with source type, URL, version/date when known, and relevant pages/timestamps. Clearly mark missing, partially inspected, or unavailable material; continue with accessible evidence.
+
 ## Acquire and preserve original figures
 
 Read the actual PDF pages and captions before selecting crops. The default is a screenshot-style crop from a rendered PDF page, preserving the complete figure as it appears in the paper. Start at 200 DPI and use 250–300 DPI or higher for small labels, thin lines, or dense panels when needed. Aim for comfortably clear figures at the intended display size. This is a programmatic PDF capture and does not need a physical screen or desktop interaction. Extracting an individual embedded bitmap can lose vector arrows, text, multi-panel composition, or legends; rendering the page preserves their composition.
