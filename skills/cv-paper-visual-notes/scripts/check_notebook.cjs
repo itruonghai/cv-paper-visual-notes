@@ -44,7 +44,7 @@ const [notebook,outdir,playwrightPath,browserPath]=process.argv.slice(2);
       const before=await page.locator('.capture-card').count();
       await commentFigure.first().click();
       await page.locator('#capture-comment').fill('Temporary verification question.');
-      await page.locator('#capture-tag').selectOption('question');
+      await page.locator('#capture-tag input[value="question"]').check();
       await page.locator('#capture-form button[type="submit"]').click();
       if(await page.locator('.capture-card').count()!==before+1)throw new Error('Figure capture failed');
       const exported=page.waitForEvent('download');await page.locator('#export-annotations').click();
@@ -59,7 +59,7 @@ const [notebook,outdir,playwrightPath,browserPath]=process.argv.slice(2);
     if(await passage.count()){
       const before=await page.locator('.capture-card').count();
       await passage.first().evaluate(el=>{const range=document.createRange();range.selectNodeContents(el);getSelection().removeAllRanges();getSelection().addRange(range);el.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));});
-      await page.locator('#capture-selection').click();
+      await page.locator('#capture-selection [data-action="comment"]').click();
       await page.locator('#capture-comment').fill('Temporary verification highlight.');
       await page.locator('#capture-form button[type="submit"]').click();
       if(await page.locator('.capture-card').count()!==before+1)throw new Error('Text capture failed');

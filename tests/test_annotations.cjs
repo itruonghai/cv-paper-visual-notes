@@ -57,3 +57,14 @@ test('Digest preserves origin, quote, words, IDs, and orphan state',()=>{
   const digest=A.digest(d,d.annotations,{'ann-one':false});
   for(const value of ['notebook-prose','ann-one','needs reattachment','the mechanism',a.comment])assert.ok(digest.includes(value));
 });
+test('Sentence under a position keeps academic abbreviations inside one sentence',()=>{
+  const at=(text,word)=>{const s=A.sentenceAt(text,text.indexOf(word));return text.slice(s.start,s.end);};
+  const text='Scope. The loss follows (Eq. 2) and Fig. 3 shows it, as in Marks et al. (2024), e.g. on ViTs. Next claim here.';
+  assert.equal(at(text,'loss'),'The loss follows (Eq. 2) and Fig. 3 shows it, as in Marks et al. (2024), e.g. on ViTs.');
+  assert.equal(at(text,'ViTs'),'The loss follows (Eq. 2) and Fig. 3 shows it, as in Marks et al. (2024), e.g. on ViTs.');
+  assert.equal(at(text,'Next'),'Next claim here.');
+  assert.equal(at(text,'Scope'),'Scope.');
+  assert.equal(at('Inherited from Ameisen et al. Trained on tokens (Sec. 3.2).','Trained'),'Inherited from Ameisen et al. Trained on tokens (Sec. 3.2).');
+  const lead='  Two claims. ';assert.deepEqual(A.sentenceAt(lead,4),{start:2,end:13});
+  assert.equal(A.sentenceAt('   ',1),null);
+});

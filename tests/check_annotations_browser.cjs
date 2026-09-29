@@ -29,8 +29,8 @@ async function capture(page,selector='#opening',comment='Why does this design he
     const range=document.createRange();range.setStart(text,0);range.setEnd(text,Math.min(text.length,'This exact sentence explains the design intention.'.length));
     getSelection().removeAllRanges();getSelection().addRange(range);element.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));
   });
-  await page.locator('#capture-selection').click();await page.locator('#capture-comment').fill(comment);
-  await page.locator('#capture-tag').selectOption('question');await page.locator('#capture-form button[type="submit"]').click();
+  await page.locator('#capture-selection [data-action="comment"]').click();await page.locator('#capture-comment').fill(comment);
+  await page.locator('#capture-tag input[value="question"]').check();await page.locator('#capture-form button[type="submit"]').click();
 }
 async function exported(page,name='#export-annotations',filename='export.json'){
   const waiting=page.waitForEvent('download');await page.locator(name).click();
@@ -40,6 +40,24 @@ async function importDoc(page,doc){
   await page.locator('#import-annotations').setInputFiles({name:'annotations.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify(doc))});
   await page.waitForFunction(()=>!document.getElementById('import-annotations').value);
 }
+// Screen point at the middle of a word inside an element's first text node.
+async function wordPoint(page,selector,word){
+  return page.locator(selector).evaluate((element,word)=>{
+    const text=document.createTreeWalker(element,NodeFilter.SHOW_TEXT).nextNode(),at=text.data.indexOf(word);
+    const range=document.createRange();range.setStart(text,at);range.setEnd(text,at+word.length);
+    const box=range.getBoundingClientRect();return {x:box.left+box.width/2,y:box.top+box.height/2};
+  },word);
+}
+async function selectWords(page,selector,words){
+  await page.locator(selector).evaluate((element,words)=>{
+    const text=document.createTreeWalker(element,NodeFilter.SHOW_TEXT).nextNode(),at=text.data.indexOf(words);
+    const range=document.createRange();range.setStart(text,at);range.setEnd(text,at+words.length);
+    getSelection().removeAllRanges();getSelection().addRange(range);
+  },words);
+}
+async function rightClick(page,point){await page.mouse.click(point.x,point.y,{button:'right'});}
+const menuItem=(page,label)=>page.locator('#capture-menu').getByRole('menuitem',{name:label,exact:true});
+const highlightCount=(page,name)=>page.evaluate(name=>CSS.highlights.get(name)?.size||0,name);
 async function mockFolder(page){
   await page.evaluate(()=>{
     const seed=JSON.parse(document.getElementById('notebook-seed').textContent);
@@ -276,6 +294,84 @@ async function mockFolder(page){
     });
     await page.waitForFunction(()=>!document.getElementById('capture-selection').classList.contains('hidden'));
     await page.context().close();
+  });
+  await test('Right-click a selection offers Highlight, Key idea, Comment; Highlight saves a plain capture',async()=>{
+    const page=await open();await selectWords(page,'#opening','design intention');
+    await rightClick(page,await wordPoint(page,'#opening','design'));
+    assert.equal(await page.locator('#capture-menu').isVisible(),true);
+    for(const label of [ui.menu_highlight,ui.menu_key_idea,ui.menu_comment])assert.equal(await menuItem(page,label).isVisible(),true,label);
+    await menuItem(page,ui.menu_highlight).click();
+    assert.equal(await page.locator('#capture-menu').isVisible(),false);
+    const a=JSON.parse(await exported(page)).annotations[0];
+    assert.equal(a.target.exact,'design intention');assert.equal(a.comment,'');assert.deepEqual(a.tags,[]);
+    assert.equal(await highlightCount(page,'cv-highlight'),1);assert.equal(await highlightCount(page,'cv-key'),0);
+    assert.equal(await page.locator('#capture-toast').isVisible(),true);
+  });
+  await test('Right-click a sentence with nothing selected marks the whole sentence as a key idea',async()=>{
+    const page=await open();await page.evaluate(()=>getSelection().removeAllRanges());
+    await rightClick(page,await wordPoint(page,'#opening','explains'));
+    await menuItem(page,ui.menu_sentence_key).click();
+    const a=JSON.parse(await exported(page)).annotations[0];
+    assert.equal(a.target.exact,'This exact sentence explains the design intention.');assert.deepEqual(a.tags,['key idea']);
+    assert.equal(await highlightCount(page,'cv-key'),1);
+    assert.equal(await page.evaluate(()=>getSelection().isCollapsed),true);
+  });
+  await test('Comment opens a small box beside the passage with tag chips and keeps the reading position',async()=>{
+    const page=await open();await selectWords(page,'#opening','design intention');
+    const before=await page.evaluate(()=>scrollY);
+    await rightClick(page,await wordPoint(page,'#opening','design'));await menuItem(page,ui.menu_comment).click();
+    const box=page.locator('#capture-popover');assert.equal(await box.isVisible(),true);
+    assert.equal(await page.evaluate(()=>!!document.querySelector('dialog[open]')),false,'comment box must not be a modal dialog');
+    const passage=await page.locator('#opening').boundingBox(),popover=await box.boundingBox();
+    assert.ok(popover.width<=460,'comment box is not small');
+    assert.ok(Math.abs(popover.y-(passage.y+passage.height))<120||Math.abs(popover.y+popover.height-passage.y)<120,'comment box is not beside the passage');
+    assert.equal(await page.evaluate(()=>document.activeElement.id),'capture-comment');
+    await page.locator('#capture-comment').fill('Is this the central claim?');await page.locator('#capture-tag input[value="key idea"]').check();
+    await page.keyboard.press('ControlOrMeta+Enter');
+    assert.equal(await box.isVisible(),false);
+    assert.ok(Math.abs(await page.evaluate(()=>scrollY)-before)<5);
+    const a=JSON.parse(await exported(page)).annotations[0];
+    assert.equal(a.comment,'Is this the central claim?');assert.deepEqual(a.tags,['key idea']);
+    assert.equal(await highlightCount(page,'cv-key'),1);
+  });
+  await test('Right-click an existing highlight to toggle key idea or remove it; Undo restores it',async()=>{
+    const page=await open();await selectWords(page,'#opening','design intention');
+    await rightClick(page,await wordPoint(page,'#opening','design'));await menuItem(page,ui.menu_highlight).click();
+    const point=await wordPoint(page,'#opening','intention');
+    await rightClick(page,point);
+    for(const label of [ui.menu_add_comment,ui.menu_mark_key,ui.menu_remove])assert.equal(await menuItem(page,label).isVisible(),true,label);
+    await menuItem(page,ui.menu_mark_key).click();assert.equal(await highlightCount(page,'cv-key'),1);
+    await rightClick(page,point);assert.equal(await menuItem(page,ui.menu_unmark_key).isVisible(),true);
+    await menuItem(page,ui.menu_remove).click();
+    assert.equal(await highlightCount(page,'cv-captures'),0);
+    assert.equal(JSON.parse(await exported(page)).annotations[0].status,'archived');
+    await page.locator('#capture-toast').getByRole('button',{name:ui.undo}).click();
+    assert.equal(await highlightCount(page,'cv-captures'),1);
+    assert.equal(JSON.parse(await exported(page)).annotations[0].status,'open');
+  });
+  await test('Left-click a commented highlight opens its comment',async()=>{
+    const page=await open();await capture(page,'#opening','Why does this design help?');
+    await page.evaluate(()=>getSelection().removeAllRanges());
+    const point=await wordPoint(page,'#opening','sentence');await page.mouse.click(point.x,point.y);
+    assert.equal(await page.locator('#capture-popover').isVisible(),true);
+    assert.equal(await page.locator('#capture-comment').inputValue(),'Why does this design help?');
+    await page.keyboard.press('Escape');assert.equal(await page.locator('#capture-popover').isVisible(),false);
+  });
+  await test('Shift+right-click and right-click outside the paper keep the browser menu; Escape closes ours',async()=>{
+    const page=await open();
+    const nativeKept=await page.evaluate(()=>[
+      document.getElementById('opening').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,shiftKey:true,clientX:5,clientY:5})),
+      document.querySelector('h1').dispatchEvent(new MouseEvent('contextmenu',{bubbles:true,cancelable:true,clientX:5,clientY:5}))]);
+    assert.deepEqual(nativeKept,[true,true]);assert.equal(await page.locator('#capture-menu').isVisible(),false);
+    await rightClick(page,await wordPoint(page,'#opening','explains'));assert.equal(await page.locator('#capture-menu').isVisible(),true);
+    await page.keyboard.press('Escape');assert.equal(await page.locator('#capture-menu').isVisible(),false);
+  });
+  await test('Touch toolbar offers Highlight, Key idea, and Comment for a selection',async()=>{
+    const page=await open();await selectWords(page,'#opening','design intention');
+    await page.waitForFunction(()=>!document.getElementById('capture-selection').classList.contains('hidden'));
+    assert.equal(await page.locator('#capture-selection button').count(),3);
+    await page.locator('#capture-selection [data-action="key"]').click();
+    assert.deepEqual(JSON.parse(await exported(page)).annotations[0].tags,['key idea']);
   });
   assert.deepEqual(failed,[],'Failed scenarios: '+failed.join('; '));assert.deepEqual(errors,[]);console.log(JSON.stringify({status:'passed',checks:passed.length,passed}));
 })().catch(error=>{console.error(error);process.exitCode=1;}).finally(async()=>{clearTimeout(timer);if(browser)await browser.close();});

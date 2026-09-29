@@ -11,7 +11,7 @@ The skill creates a portable HTML reading notebook with:
 - Ablations and diagnostics that explain model behavior, with controls and caveats.
 - Limitations, creative extensions, and concrete experiments to test those ideas.
 - Supplementary diagrams when a workflow is unclear, labeled separately from the paper's original figures.
-- Markdown notes, persistent text highlights, whole-figure comments, and an editable capture panel.
+- Markdown notes and reading-test-style captures: right-click to highlight, mark a key idea (a whole sentence, no selection needed), or comment in a small box with tags; whole-figure comments and an editable capture panel.
 - Portable annotation files and Markdown capture digests, with linked agent replies on rebuild.
 - Explicit folder saving in compatible browsers, download fallback, and recovery copies.
 

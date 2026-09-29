@@ -77,6 +77,27 @@
     const suffixNear = after ? text.slice(end, end + after) === target.suffix.slice(0, after) : end === text.length;
     return prefixNear || suffixNear ? {start, end, drifted: true} : null;
   }
+  // The sentence containing an offset, trimmed. Generic sentence segmentation
+  // breaks after "Eq.", "Fig.", or "et al.", so those pieces are rejoined, as is
+  // any piece that continues in lowercase, a digit, or punctuation.
+  const ABBREVIATION = /\b(?:e\.g|i\.e|et al|cf|vs|approx|resp|eqs?|figs?|secs?|tabs?|refs?|apps?|alg|ch|nos?)\.$/i;
+  function sentenceAt(text, offset, locale) {
+    const pieces = globalThis.Intl?.Segmenter
+      ? [...new Intl.Segmenter(locale || undefined, {granularity: 'sentence'}).segment(text)].map(s => [s.index, s.index + s.segment.length])
+      : [...text.matchAll(/[^.!?]*[.!?]+["')\]]*\s*|[^.!?]+$/g)].map(m => [m.index, m.index + m[0].length]);
+    const sentences = [];
+    for (const [start, end] of pieces) {
+      const last = sentences[sentences.length - 1];
+      if (last && (ABBREVIATION.test(text.slice(...last).trim()) || /^\s*[a-z0-9(\[,;:)\]]/.test(text.slice(start, end)))) last[1] = end;
+      else sentences.push([start, end]);
+    }
+    const found = sentences.find(([, end]) => offset < end) || sentences[sentences.length - 1];
+    if (!found) return null;
+    let [start, end] = found;
+    while (start < end && /\s/.test(text[start])) start++;
+    while (end > start && /\s/.test(text[end - 1])) end--;
+    return end > start ? {start, end} : null;
+  }
   function digest(doc, items = doc.annotations, states = {}) {
     let text = '# Reading captures — ' + doc.paper_id + ' (' + doc.version + ')\n\n';
     text += 'Verbatim captures and reader comments; not an AI synthesis.\n';
@@ -94,7 +115,7 @@
     }
     return text;
   }
-  const api = {clone, same, id, touch, validate, merge, locate, digest};
+  const api = {clone, same, id, touch, validate, merge, locate, sentenceAt, digest};
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else globalThis.CvAnnotations = api;
 })();

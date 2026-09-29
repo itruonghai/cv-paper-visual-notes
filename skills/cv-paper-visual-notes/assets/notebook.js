@@ -166,7 +166,7 @@
   function textRange(nodes, start, end) {
     const range = document.createRange(); let total = 0, started = false;
     for (const node of nodes) {
-      if (!started && start <= total + node.length) { range.setStart(node, Math.max(0, start - total)); started = true; }
+      if (!started && start < total + node.length) { range.setStart(node, Math.max(0, start - total)); started = true; }
       if (started && end <= total + node.length) { range.setEnd(node, Math.max(0, end - total)); return range; }
       total += node.length;
     }
@@ -174,19 +174,18 @@
   }
   const textTarget = (text, start, end) =>
     ({exact: text.slice(start, end), prefix: text.slice(Math.max(0, start - 48), start), suffix: text.slice(end, end + 48), start, end});
-  function selectionTarget() {
-    const selection = getSelection(); if (!selection.rangeCount || selection.isCollapsed) return null;
-    const range = selection.getRangeAt(0);
-    const element = node => node.nodeType === 1 ? node : node.parentElement;
-    const section = element(range.startContainer).closest('[data-annotatable]');
-    if (!section || element(range.endContainer).closest('[data-annotatable]') !== section) return null;
-    if (element(range.startContainer).closest('[data-capture-ui]')) return null;
+  const elementOf = node => node.nodeType === 1 ? node : node.parentElement;
+  // A text capture target for a DOM range inside one annotatable section.
+  function rangeTarget(range) {
+    const section = elementOf(range.startContainer).closest('[data-annotatable]');
+    if (!section || elementOf(range.endContainer).closest('[data-annotatable]') !== section) return null;
+    if (elementOf(range.startContainer).closest('[data-capture-ui]')) return null;
     const nodes = textNodes(section), text = nodes.map(n => n.data).join('');
     const start = pointOffset(nodes, range.startContainer, range.startOffset), end = pointOffset(nodes, range.endContainer, range.endOffset);
     if (!text.slice(start, end).trim()) return null;
     // Only explicitly attributed spans are treated as source quotations.
-    const origin = element(range.startContainer).closest('[data-origin]');
-    const originEnd = element(range.endContainer).closest('[data-origin]');
+    const origin = elementOf(range.startContainer).closest('[data-origin]');
+    const originEnd = elementOf(range.endContainer).closest('[data-origin]');
     const kind = origin && origin === originEnd && ['original-caption', 'paper-passage', 'user-note'].includes(origin.dataset.origin) ? origin.dataset.origin : 'notebook-prose';
     return {
       kind: 'text', section_id: section.id, section_title: section.querySelector('h2').textContent,
@@ -194,6 +193,37 @@
       source: {kind, ref: kind === 'notebook-prose' ? 'notebook.html#' + section.id : (origin.dataset.sourceRef || seed.sourceUrl || section.id)},
       target: textTarget(text, start, end)
     };
+  }
+  function selectionTarget() {
+    const selection = getSelection(); if (!selection.rangeCount || selection.isCollapsed) return null;
+    return rangeTarget(selection.getRangeAt(0));
+  }
+  const selectionBox = () => getSelection().rangeCount ? getSelection().getRangeAt(0).getBoundingClientRect() : null;
+  function caretAt(x, y) {
+    if (document.caretPositionFromPoint) { const p = document.caretPositionFromPoint(x, y); return p && {node: p.offsetNode, offset: p.offset}; }
+    const r = document.caretRangeFromPoint?.(x, y); return r && {node: r.startContainer, offset: r.startOffset};
+  }
+  // The authored text position under the pointer, only when the pointer is over that text.
+  function textPoint(x, y) {
+    const caret = caretAt(x, y); if (!caret || caret.node.nodeType !== 3) return null;
+    const parent = caret.node.parentElement, section = parent.closest('[data-annotatable]');
+    if (!section || parent.closest('button,[data-capture-ui]')) return null;
+    // Caret APIs snap to the nearest text, so require the pointer to be over its line boxes.
+    const probe = document.createRange(); probe.selectNodeContents(caret.node);
+    if (![...probe.getClientRects()].some(box => x >= box.left - 2 && x <= box.right + 2 && y >= box.top - 2 && y <= box.bottom + 2)) return null;
+    const nodes = textNodes(section);
+    return {section, nodes, text: nodes.map(n => n.data).join(''), node: caret.node, at: pointOffset(nodes, caret.node, caret.offset)};
+  }
+  // The whole sentence under the pointer, so a central claim needs no manual selection.
+  const BLOCKS = 'p,li,td,th,dd,dt,figcaption,blockquote,summary,h3,h4,h5,h6';
+  function sentenceTarget(point) {
+    const block = point.node.parentElement.closest(BLOCKS);
+    if (!block || !point.section.contains(block)) return null;
+    const whole = document.createRange(); whole.selectNodeContents(block);
+    const from = pointOffset(point.nodes, whole.startContainer, whole.startOffset), to = pointOffset(point.nodes, whole.endContainer, whole.endOffset);
+    const sentence = A.sentenceAt(point.text.slice(from, to), point.at - from, document.documentElement.lang);
+    const range = sentence && textRange(point.nodes, from + sentence.start, from + sentence.end);
+    return range ? rangeTarget(range) : null;
   }
   // Recompute on every selection change so a cleared selection is never reused.
   function readSelection() {
@@ -206,56 +236,203 @@
   document.addEventListener('keyup', event => { if (event.key.startsWith('Arrow') || event.key === 'Shift') readSelection(); });
   // Touch selection handles fire no mouseup, so also follow selectionchange.
   document.addEventListener('selectionchange', () => { clearTimeout(selectionTimer); selectionTimer = setTimeout(readSelection, 250); });
-  $('capture-selection').onpointerdown = event => event.preventDefault();
   let toastTimer = null;
-  function toast(message) {
+  function toast(message, undo = null) {
     report('capture-toast-text', message); $('capture-toast').classList.remove('hidden');
-    clearTimeout(toastTimer); toastTimer = setTimeout(() => $('capture-toast').classList.add('hidden'), 5000);
+    $('capture-undo').classList.toggle('hidden', !undo);
+    $('capture-undo').onclick = () => { $('capture-toast').classList.add('hidden'); undo(); };
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => $('capture-toast').classList.add('hidden'), 6000);
   }
-  function openCapture(target, editId = null) {
-    composing = A.clone(target); editingId = editId;
+  function setPending(range) {
+    if (globalThis.Highlight && CSS.highlights) range ? CSS.highlights.set('cv-pending', new Highlight(range)) : CSS.highlights.delete('cv-pending');
+  }
+  function clearSelection() {
+    getSelection().removeAllRanges(); pendingTarget = null; $('capture-selection').classList.add('hidden');
+  }
+
+  // Popover panels sit beside their anchor: below it when there is room,
+  // otherwise above, clamped to the viewport. Narrow screens use a bottom sheet (CSS).
+  function place(panel, box) {
+    const gap = 8, width = panel.offsetWidth, height = panel.offsetHeight;
+    let top = box.bottom + gap;
+    if (top + height > innerHeight - gap && box.top - gap - height > gap) top = box.top - gap - height;
+    top = Math.max(gap, Math.min(top, innerHeight - height - gap));
+    const left = Math.max(gap, Math.min(box.left, innerWidth - width - gap));
+    panel.style.top = top + scrollY + 'px'; panel.style.left = left + scrollX + 'px';
+  }
+  const popover = $('capture-popover'), menu = $('capture-menu');
+  function chip(value, label) {
+    const wrapper = node('label'), input = document.createElement('input');
+    input.type = 'radio'; input.name = 'capture-tag'; input.value = value;
+    wrapper.append(input, node('span', label)); $('capture-tag').append(wrapper); return input;
+  }
+  const tagInput = value => [...popover.querySelectorAll('input[name="capture-tag"]')].find(input => input.value === value);
+  function openCapture(target, editId = null, box = null) {
+    closeMenu(); composing = A.clone(target); editingId = editId;
     $('capture-excerpt').textContent = target.kind === 'text' ? target.target.exact : target.target.caption;
     $('capture-origin').textContent = target.source.kind + ' · ' + target.source.ref;
-    $('capture-comment').value = target.comment || ''; $('capture-tag').value = target.tags?.[0] || '';
-    const firstTag = target.tags?.[0];
-    if (firstTag && ![...$('capture-tag').options].some(option => option.value === firstTag)) {
-      $('capture-tag').add(new Option(firstTag, firstTag)); $('capture-tag').value = firstTag;
-    }
-    $('capture-dialog').showModal(); $('capture-comment').focus();
+    $('capture-comment').value = target.comment || '';
+    const firstTag = target.tags?.[0] || '';
+    (tagInput(firstTag) || chip(firstTag, firstTag)).checked = true;
+    if (target.kind === 'text') setPending(editId ? anchors.get(editId) : getSelection().rangeCount ? getSelection().getRangeAt(0).cloneRange() : null);
+    popover.classList.remove('hidden');
+    place(popover, box || {left: (innerWidth - popover.offsetWidth) / 2, top: innerHeight / 3, bottom: innerHeight / 3});
+    $('capture-comment').focus({preventScroll: true});
   }
-  $('capture-selection').onclick = () => { if (pendingTarget) openCapture(pendingTarget); };
-  $('cancel-capture').onclick = () => $('capture-dialog').close();
+  function closeCapture() { popover.classList.add('hidden'); setPending(null); composing = null; editingId = null; }
+  $('cancel-capture').onclick = closeCapture;
+  $('capture-form').addEventListener('keydown', event => {
+    if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) { event.preventDefault(); $('capture-form').requestSubmit(); }
+  });
+  function commit() { A.touch(doc); saveCapturesDraft(); dirty(); renderCaptures(); }
   $('capture-form').onsubmit = event => {
     event.preventDefault(); if (!composing) return;
+    const tag = popover.querySelector('input[name="capture-tag"]:checked')?.value || '';
     const annotation = {...composing, id: editingId || A.id(), comment: $('capture-comment').value,
-      tags: [...new Set([$('capture-tag').value, ...(composing.tags || []).slice(1)].filter(Boolean))],
+      tags: [...new Set([tag, ...(composing.tags || []).slice(1)].filter(Boolean))],
       status: composing.status || 'open', created_at: composing.created_at || now(), updated_at: now()};
     const index = doc.annotations.findIndex(a => a.id === editingId);
     if (index >= 0) doc.annotations[index] = annotation; else doc.annotations.push(annotation);
-    A.touch(doc); saveCapturesDraft(); dirty(); renderCaptures(); $('capture-dialog').close();
+    const text = composing.kind === 'text';
+    closeCapture(); commit();
     // The highlight now marks the passage; keep the reader where they are.
-    if (composing.kind === 'text') getSelection().removeAllRanges();
-    pendingTarget = null; $('capture-selection').classList.add('hidden'); toast(t('capture_saved'));
+    if (text) clearSelection();
+    toast(t('capture_saved'));
+  };
+  // One-step highlight or key idea, as in computer-based reading tests.
+  function quickCapture(target, tags) {
+    doc.annotations.push({...A.clone(target), id: A.id(), comment: '', tags, status: 'open', created_at: now(), updated_at: now()});
+    commit(); clearSelection(); toast(t(tags.includes('key idea') ? 'key_saved' : 'highlight_saved'));
+  }
+  $('capture-selection').onpointerdown = event => event.preventDefault();
+  $('capture-selection').onclick = event => {
+    const action = event.target.closest('[data-action]')?.dataset.action; if (!action || !pendingTarget) return;
+    if (action === 'comment') openCapture(pendingTarget, null, selectionBox());
+    else quickCapture(pendingTarget, action === 'key' ? ['key idea'] : []);
   };
   const sectionContext = section => ({section_id: section.id, section_title: section.querySelector('h2').textContent,
     content_revision: seed.sectionRevisions[section.id]});
   const figureTarget = figure => ({figure_id: figure.id, fingerprint: figure.dataset.figureFingerprint, files: JSON.parse(figure.dataset.figureFiles),
     caption: figure.querySelector('figcaption')?.textContent || figure.querySelector('img')?.alt || figure.id});
+  function figureCapture(figure) {
+    const section = figure.closest('[data-annotatable]');
+    return {kind: 'figure', ...sectionContext(section), source: {kind: 'figure', ref: figure.querySelector('figcaption a')?.href || seed.sourceUrl || section.id},
+      target: figureTarget(figure)};
+  }
   document.querySelectorAll('[data-annotatable] figure').forEach(figure => {
     const button = document.createElement('button'); button.type = 'button'; button.className = 'figure-comment';
     button.dataset.captureUi = 'true'; button.textContent = t('comment_figure');
-    button.onclick = () => {
-      const section = figure.closest('[data-annotatable]');
-      openCapture({kind: 'figure', ...sectionContext(section), source: {kind: 'figure', ref: figure.querySelector('figcaption a')?.href || seed.sourceUrl || section.id},
-        target: figureTarget(figure)});
-    };
+    button.onclick = () => openCapture(figureCapture(figure), null, button.getBoundingClientRect());
     figure.append(button);
   });
+
+  // Right-click menu. Shift+right-click, and right-clicks outside the paper
+  // sections, keep the browser's own menu.
+  function closeMenu() { menu.classList.add('hidden'); menu.replaceChildren(); }
+  function openMenu(x, y, items) {
+    menu.replaceChildren();
+    for (const [label, action] of items) {
+      const item = node('button', label); item.type = 'button'; item.setAttribute('role', 'menuitem');
+      item.onpointerdown = event => event.preventDefault();
+      item.onclick = () => { closeMenu(); action(); };
+      menu.append(item);
+    }
+    menu.append(node('p', t('menu_native_hint'), 'menu-hint'));
+    menu.classList.remove('hidden'); place(menu, {left: x, top: y, bottom: y});
+    menu.querySelector('[role="menuitem"]').focus({preventScroll: true});
+  }
+  menu.addEventListener('keydown', event => {
+    const items = [...menu.querySelectorAll('[role="menuitem"]')], at = items.indexOf(document.activeElement);
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault(); items[(at + (event.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+    }
+  });
+  let rightClickSelection;
+  // captureAt: the smallest visible text capture under a pointer position.
+  function captureAt(point) {
+    let best = null, size = Infinity;
+    for (const a of doc.annotations) {
+      const span = spans.get(a.id);
+      if (a.status === 'archived' || !span || span.section !== point.section.id || point.at < span.start || point.at > span.end) continue;
+      if (span.end - span.start < size) { best = a; size = span.end - span.start; }
+    }
+    return best;
+  }
+  function copyText(text) {
+    if (!document.execCommand('copy')) navigator.clipboard?.writeText(text).catch(() => {});
+  }
+  document.addEventListener('pointerdown', event => {
+    // Snapshot before the browser moves the selection (macOS selects a word on right-click).
+    if (event.button === 2) rightClickSelection = selectionTarget();
+    if (!menu.contains(event.target)) closeMenu();
+    const unchanged = composing && $('capture-comment').value === (composing.comment || '');
+    if (unchanged && !popover.contains(event.target) && !menu.contains(event.target)) closeCapture();
+  }, true);
+  document.addEventListener('contextmenu', event => {
+    const selected = rightClickSelection !== undefined ? rightClickSelection : selectionTarget(); rightClickSelection = undefined;
+    if (event.shiftKey || event.target.closest?.('#capture-menu,#capture-popover,#capture-panel,[data-capture-ui]')) return;
+    let x = event.clientX, y = event.clientY;
+    if (selected) {
+      const box = selectionBox();
+      if (box && !x && !y) { x = box.left; y = box.bottom; }  // keyboard context-menu key
+      event.preventDefault();
+      openMenu(x, y, [
+        [t('menu_highlight'), () => quickCapture(selected, [])],
+        [t('menu_key_idea'), () => quickCapture(selected, ['key idea'])],
+        [t('menu_comment'), () => openCapture(selected, null, box)],
+        [t('menu_copy'), () => copyText(selected.target.exact)]]);
+      return;
+    }
+    const point = textPoint(x, y), existing = point && captureAt(point);
+    if (existing) {
+      event.preventDefault(); getSelection().removeAllRanges();
+      const key = existing.tags.includes('key idea'), box = anchors.get(existing.id).getBoundingClientRect();
+      openMenu(x, y, [
+        [t(existing.comment ? 'menu_edit_comment' : 'menu_add_comment'), () => openCapture(existing, existing.id, box)],
+        [t(key ? 'menu_unmark_key' : 'menu_mark_key'), () => mutate(existing, {tags: key ? existing.tags.filter(tag => tag !== 'key idea') : ['key idea', ...existing.tags]})],
+        [t('menu_remove'), () => {
+          const before = existing.status; mutate(existing, {status: 'archived'});
+          toast(t('highlight_removed'), () => mutate(existing, {status: before}));
+        }]]);
+      return;
+    }
+    const sentence = point && sentenceTarget(point);
+    if (sentence) {
+      event.preventDefault(); getSelection().removeAllRanges();
+      const box = () => textRange(point.nodes, sentence.target.start, sentence.target.end)?.getBoundingClientRect();
+      openMenu(x, y, [
+        [t('menu_sentence_highlight'), () => quickCapture(sentence, [])],
+        [t('menu_sentence_key'), () => quickCapture(sentence, ['key idea'])],
+        [t('menu_sentence_comment'), () => {
+          const range = textRange(point.nodes, sentence.target.start, sentence.target.end);
+          openCapture(sentence, null, box()); setPending(range);
+        }]]);
+      return;
+    }
+    const figure = event.target.closest?.('[data-annotatable] figure');
+    if (figure) {
+      event.preventDefault();
+      openMenu(x, y, [[t('menu_figure_comment'), () => openCapture(figureCapture(figure), null, figure.getBoundingClientRect())]]);
+    }
+  });
+  // Left-click a commented highlight to read or edit its comment.
+  document.addEventListener('click', event => {
+    if (event.button !== 0 || !getSelection().isCollapsed) return;
+    if (event.target.closest('a,button,input,textarea,select,summary,label,[data-capture-ui],#capture-popover,#capture-menu,#capture-panel')) return;
+    const point = textPoint(event.clientX, event.clientY), a = point && captureAt(point);
+    if (a?.comment) openCapture(a, a.id, anchors.get(a.id).getBoundingClientRect());
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    if (!menu.classList.contains('hidden')) closeMenu(); else if (!popover.classList.contains('hidden')) closeCapture();
+  });
+  addEventListener('scroll', closeMenu, {passive: true});
+  addEventListener('resize', closeMenu);
   // review: captures still attached whose target changed; the reader confirms
   // the new position before its stored target is updated.
-  let review = new Map();
+  let review = new Map(), spans = new Map();
   function refreshAnchors() {
-    anchors = new Map(); review = new Map(); const highlights = [];
+    anchors = new Map(); review = new Map(); spans = new Map(); const highlights = [];
     for (const a of doc.annotations) {
       if (a.kind === 'figure') {
         // Figure IDs are notebook-unique, so a recaptured or moved figure is still found.
@@ -271,14 +448,24 @@
         const location = A.locate(text, a.target, a.content_revision === seed.sectionRevisions[a.section_id]);
         if (location) {
           const range = textRange(nodes, location.start, location.end);
-          if (range) { anchors.set(a.id, range); if (a.status !== 'archived') highlights.push(range); }
+          if (range) {
+            anchors.set(a.id, range); spans.set(a.id, {section: section.id, start: location.start, end: location.end});
+            if (a.status !== 'archived') highlights.push([range, a]);
+          }
           if (range && location.drifted) {
             review.set(a.id, {message: 'anchor_drifted', action: 'confirm_anchor', update: {...sectionContext(section), target: textTarget(text, location.start, location.end)}});
           }
         }
       }
     }
-    if (globalThis.Highlight && CSS.highlights) CSS.highlights.set('cv-captures', new Highlight(...highlights));
+    if (globalThis.Highlight && CSS.highlights) {
+      // cv-captures lists every visible capture; the other three carry the colours.
+      const style = a => a.tags.includes('key idea') ? 'cv-key' : a.comment ? 'cv-comment' : 'cv-highlight';
+      CSS.highlights.set('cv-captures', new Highlight(...highlights.map(([range]) => range)));
+      for (const name of ['cv-highlight', 'cv-comment', 'cv-key']) {
+        CSS.highlights.set(name, new Highlight(...highlights.filter(([, a]) => style(a) === name).map(([range]) => range)));
+      }
+    }
   }
   function jump(a) {
     const anchor = anchors.get(a.id); if (!anchor) return;
@@ -324,7 +511,7 @@
       if (a.conflict_of) card.append(node('p', t('conflicting_copy') + ' ' + a.conflict_of, 'meta'));
       const controls = node('div', undefined, 'note-controls');
       const jumpButton = button(t('jump_capture'), () => jump(a), controls); jumpButton.disabled = !anchors.has(a.id);
-      button(t('edit_capture'), () => openCapture(a, a.id), controls);
+      const edit = button(t('edit_capture'), () => openCapture(a, a.id, edit.getBoundingClientRect()), controls);
       button(t(a.status === 'resolved' ? 'reopen_capture' : 'resolve_capture'), () => mutate(a, {status: a.status === 'resolved' ? 'open' : 'resolved'}), controls);
       button(t(a.status === 'archived' ? 'restore_capture' : 'archive_capture'), () => mutate(a, {status: a.status === 'archived' ? 'open' : 'archived'}), controls);
       const history = () => [...(a.target_history || []), {target: a.target, source: a.source, section_id: a.section_id, content_revision: a.content_revision}];
