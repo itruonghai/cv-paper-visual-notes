@@ -11,7 +11,9 @@ The skill creates a portable HTML reading notebook with:
 - Ablations and diagnostics that explain model behavior, with controls and caveats.
 - Limitations, creative extensions, and concrete experiments to test those ideas.
 - Supplementary diagrams when a workflow is unclear, labeled separately from the paper's original figures.
-- Persistent Markdown notes and follow-up discussions.
+- Markdown notes, persistent text highlights, whole-figure comments, and an editable capture panel.
+- Portable annotation files and Markdown capture digests, with linked agent replies on rebuild.
+- Explicit folder saving in compatible browsers, download fallback, and recovery copies.
 
 ## Install
 
@@ -129,12 +131,17 @@ Each paper folder contains:
 paper.json       Notebook source and per-paper interface settings
 notebook.html    Offline reading view with embedded figures
 notes.md         Your durable, editable notes
+annotations.json Highlights/comments, source anchors, tags, and reader-owned status
 discussion.md    Follow-up responses, created when needed
 sources.json     Figure/source provenance
 assets/          Original crops and separately labeled explanatory diagrams
 ```
 
-Browser edits are local drafts. Download the notes and save them as the paper folder's `notes.md`, or provide the download to your agent. Rebuilding preserves an existing notes file.
+Select text to highlight/comment, or use **Comment on this figure**. The capture panel supports search, tags, open questions, jumping back, and Markdown digest export. Captured notebook prose stays distinct from original paper quotations.
+
+Browser edits are local drafts. Use **Connect paper folder → Save to folder** in a compatible browser, or download `notes.md` and `annotations.json` and place them in the paper folder. Direct saving checks for external changes and keeps backups; it is not cloud synchronization. Rebuilding preserves both reader-owned files.
+
+Copy a discussion prompt after saving. The agent appends replies linked to capture IDs in `discussion.md` and rebuilds the notebook. Questions remain open until you resolve them. Changed/ambiguous anchors stay in **Needs reattachment**. See [the capture workflow](skills/cv-paper-visual-notes/references/annotations.md). Region-box comments and cross-device/cloud storage are not included.
 
 ## Update
 
@@ -165,6 +172,16 @@ Run the checks with:
 
 ```bash
 python3 -m unittest discover -s tests -v
+node --test tests/test_annotations.cjs
 ```
+
+For browser regressions, use an existing Node/Playwright/Chrome installation and a **new synthetic fixture directory**:
+
+```bash
+python3 tests/create_browser_fixture.py work/capture-check
+node tests/check_annotations_browser.cjs work/capture-check work/capture-check/results /absolute/path/to/node_modules/playwright /absolute/path/to/chrome
+```
+
+The suite stops after 48 seconds and uses temporary profiles and mocked folder access. It checks captures, source identity, imports, two-tab edits, linked replies, save conflicts/failures, and printing. Inspect its desktop/mobile screenshots. If Poppler's `pdftotext` is available, it also verifies the generated PDF contains the final technical/note markers and excludes recovery text. Native folder-picker interaction remains browser-dependent.
 
 The repository contains the skill and its helpers. Downloaded papers, extracted figures, reading notes, and local runtime configuration belong in your own workspace/library.

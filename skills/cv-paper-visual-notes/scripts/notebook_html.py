@@ -1,6 +1,7 @@
 """Parse authored HTML, embed figure assets, and flag evidence/markup omissions."""
 import base64
 import html
+import hashlib
 from html.parser import HTMLParser
 import re
 from urllib.parse import unquote, urlparse
@@ -12,12 +13,14 @@ VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "met
 
 
 class NotebookHTML(HTMLParser):
-    def __init__(self, root, math_mode="auto"):
+    def __init__(self, root, math_mode="auto", section_id="section"):
         super().__init__(convert_charrefs=False)
         self.root = root.resolve()
         self.output, self.images, self.warnings, self.figures, self.stack = [], [], [], [], []
         self.pending_text = []
         self.math_mode = math_mode
+        self.section_id = section_id
+        self.figure_ids = set()
 
     def warn(self, text):
         if text not in self.warnings:
@@ -27,7 +30,8 @@ class NotebookHTML(HTMLParser):
         self.flush_text()
         attributes = dict(attrs)
         if tag == "figure":
-            self.figures.append({"caption": False, "source": False, "text": False, "images": []})
+            self.figures.append({"caption": False, "source": False, "text": False, "images": [],
+                                 "attrs": attrs, "position": len(self.output), "hashes": []})
         if self.figures:
             if tag == "figcaption":
                 self.figures[-1]["caption"] = True
@@ -50,6 +54,7 @@ class NotebookHTML(HTMLParser):
             self.images.append(path)
             if self.figures:
                 self.figures[-1]["images"].append(source)
+                self.figures[-1]["hashes"].append(hashlib.sha256(path.read_bytes()).hexdigest())
             else:
                 self.warn(f"Image {source} is outside a figure; add a caption and attribution.")
             # The HTML parser handles > inside quoted attributes. Source bytes,
@@ -72,6 +77,17 @@ class NotebookHTML(HTMLParser):
         self.flush_text()
         if tag == "figure" and self.figures:
             figure = self.figures.pop()
+            attrs = dict(figure["attrs"])
+            identifier = attrs.get("id") or ("fig-" + self.section_id + "-" + hashlib.sha256(
+                "|".join(figure["images"]).encode("utf-8")).hexdigest()[:12])
+            if not re.fullmatch(r"[a-z][a-z0-9-]*", identifier) or identifier in self.figure_ids:
+                raise ValueError("Figures need unique lowercase hyphenated IDs; give repeated assets explicit figure IDs.")
+            self.figure_ids.add(identifier)
+            attrs.update({"id": identifier, "data-figure-files": json_list(figure["images"]),
+                          "data-figure-fingerprint": "|".join(figure["hashes"])})
+            self.output[figure["position"]] = "<figure " + " ".join(
+                key if value is None else f'{key}="{html.escape(value, quote=True)}"'
+                for key, value in attrs.items()) + ">"
             label = ", ".join(figure["images"]) or "unnamed figure"
             if not figure["caption"] or not figure["text"]:
                 self.warn(f"Figure {label} has no meaningful figcaption.")
@@ -136,3 +152,8 @@ class NotebookHTML(HTMLParser):
         if self.figures:
             self.warn("Unclosed figure element; inspect the section HTML.")
         return "".join(self.output)
+
+
+def json_list(values):
+    import json
+    return json.dumps(values, ensure_ascii=True)

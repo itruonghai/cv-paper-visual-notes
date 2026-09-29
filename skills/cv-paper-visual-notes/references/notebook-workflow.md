@@ -8,7 +8,8 @@ Keep these together in the chosen paper directory:
 paper.json             Title, stable ID, version, source, section content
 notebook.html          Portable reading view with embedded figures
 notes.md               Reader-owned notes, editable by the reader or on explicit request
-discussion.md          Agent responses and resolved/open follow-ups, when discussions occur
+annotations.json       Reader-owned highlights and whole-figure comments, with stable IDs
+discussion.md          Dated agent replies linked to annotation IDs, when discussions occur
 sources.json           Source/figure provenance, including prior papers
 assets/                Original figure and table crops; optional separate annotations
 ```
@@ -71,7 +72,7 @@ The `html` is an agent-authored fragment using paragraphs, figures, tables, list
 Use relative image paths beneath the paper folder. The builder embeds PNG/JPEG/WebP/SVG figures into the final HTML and rejects missing or external image paths. An original SVG uses the same `<img src="assets/figure.svg">` pattern; no raster conversion is needed. Example figure markup shape:
 
 ```html
-<figure>
+<figure id="fig-method">
   <img src="assets/fig-2.png" alt="Describe the actual architecture and highlighted relationship">
   <figcaption>Original Figure 2, PDF p. 4, selected paper version.
     <a href="https://example.org/paper.pdf#page=4">Source</a>.
@@ -87,7 +88,7 @@ For an agent-created explanatory diagram, save a separate asset such as `assets/
 /absolute/python /absolute/skill/scripts/build_notebook.py /path/to/paper-folder/paper.json
 ```
 
-This creates `notebook.html`, creates `notes.md` only if absent, and merges used figure sidecars into `sources.json` while preserving existing source records. It reports lint warnings; `--strict` fails before writing when warnings remain. The notebook is self-contained for offline reading, except outbound source links. It has responsive navigation, expandable technical detail, figure enlargement, and a notes editor. Adapt styles if needed to serve the paper's content; keep the build independent of hosting and external JavaScript libraries.
+This creates `notebook.html`, creates `notes.md` and `annotations.json` only if absent, and merges used figure sidecars into `sources.json` while preserving existing source records. It reports lint warnings; `--strict` fails before writing when warnings remain. The notebook is self-contained for offline reading, except outbound source links. It has responsive navigation, expandable technical detail, figure enlargement, and a notes editor. Adapt styles if needed to serve the paper's content; keep the build independent of hosting and external JavaScript libraries.
 
 ## Side-by-side comparison layout
 
@@ -109,13 +110,11 @@ For each limitation, show its source or reason and whether it is observed, autho
 
 Finish with a few focused discussion prompts tied to these ideas. The notes template has matching spaces for comparison questions, limitations, and potential extensions. Existing `notes.md` files remain reader-owned; do not insert the new headings into an existing file unless the user asks to update it.
 
-## Notes and discussion continuity
+## Notes, captures, and discussion continuity
 
-`notes.md` is the durable, agent-readable copy. The browser editor keeps a best-effort local draft, keyed by paper ID and version. Browser storage may be unavailable, cleared, or isolated across file locations. The UI states this and provides Markdown export and import. Export downloads a file; it does not silently write over the paper folder's `notes.md`. Tell the reader to place the exported file there or supply it in the next discussion. Directly editing `notes.md` is also supported.
+Read [annotations.md](annotations.md) when preparing stable figure/section anchors or handling saved captures, imports, conflicts, and agent replies. Keep section and figure IDs stable across notebook revisions. Explicitly mark genuine paper quotations/captions with `data-origin` and `data-source-ref`; otherwise selected text is notebook prose. Never infer that an empty notes file means no notes exist in a browser draft or downloaded copy.
 
-On rebuild, embed the current `notes.md` as the file snapshot. A conflicting browser draft triggers explicit “Keep my draft” and “Use the file snapshot” choices. Choosing the file preserves the previous editor text in a separate downloadable area and in the browser draft when storage is available. Neither button writes notes.md. Never claim that another agent can see unexported browser edits.
-
-For a discussion, read the supplied/current notes, target the referenced figures or claims, and append responses to `discussion.md` with date, note/figure anchor, supporting source, and open/resolved status. Rebuild the relevant explanation when asked to improve it. Keep user notes verbatim unless the user asks to edit or organize them. Do not turn a paper-specific comment into a global skill preference without the user's intent.
+The builder preserves existing `notes.md` and `annotations.json` verbatim. The reader can save through an explicitly connected folder when supported, or download both files. Neither building the HTML nor opening it grants folder write permission or synchronizes devices. Agent replies become visible on rebuild; the static notebook itself does not call a model.
 
 ## Final check
 
@@ -124,5 +123,5 @@ For a discussion, read the supplied/current notes, target the referenced figures
 - Read the overview and comparison takeaway for clarity: can a reader explain the problem, design intention, and key difference without decoding undefined jargon?
 - Confirm the dedicated comparison and limitations/extension sections are present. Check that comparison cells address the same questions and that creative proposals are visibly untested.
 - Open the built HTML in an isolated headless browser at desktop and narrow widths; inspect long figures, technical details, tables, navigation, and enlargement. Prefer local file rendering where supported; otherwise use a temporary loopback-only static server. Keep native desktop control and the user's active browser out of routine verification.
-- Test note editing/export/import and rebuild behavior when changes affect the template or helpers. For routine paper content, confirm the notes file is preserved and the UI loads.
+- Test notes and captures through editing/export/import, duplicate/conflicting records, rebuild/orphan handling, direct-save failures, and complete printing when changes affect the template or helpers. For routine paper content, confirm the notes file is preserved and the UI loads.
 - Link the notebook and notes in the final response. Mention any missing sources or unverified visual behavior concisely.

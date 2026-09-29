@@ -18,6 +18,7 @@ SKILL_DIR = Path(__file__).resolve().parents[1]
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from notebook_html import NotebookHTML
+from annotation_data import validate_annotations, discussion_replies
 
 
 def embed_images(fragment, root):
@@ -44,19 +45,28 @@ def build(source, strict=False):
         raise ValueError("math_mode must be auto or warn.")
     image_paths = set()
     identifiers = set()
-    navigation, content = [], []
+    template = (SKILL_DIR / "assets/notebook-template.html").read_text(encoding="utf-8")
+    reserved_ids = set(re.findall(r'\bid="([a-z][a-z0-9-]*)"', template))
+    navigation, content, revisions = [], [], {}
+    figure_ids = set()
     for section in sections:
         identifier = section["id"]
-        if not re.fullmatch(r"[a-z][a-z0-9-]*", identifier) or identifier in identifiers or identifier == "reader-notes":
+        if not re.fullmatch(r"[a-z][a-z0-9-]*", identifier) or identifier in identifiers or identifier in reserved_ids:
             raise ValueError(f"Section ID must be unique and lowercase hyphenated: {identifier}")
         identifiers.add(identifier)
         title = html.escape(section["title"])
-        parser = NotebookHTML(root, math_mode=math_mode)
+        parser = NotebookHTML(root, math_mode=math_mode, section_id=identifier)
         fragment = parser.finish(section["html"])
+        if figure_ids & parser.figure_ids:
+            raise ValueError("Figure IDs must be unique across the notebook.")
+        figure_ids.update(parser.figure_ids)
+        revisions[identifier] = hashlib.sha256((title + fragment).encode("utf-8")).hexdigest()
         image_paths.update(parser.images)
         warnings.extend(f"{identifier}: {warning}" for warning in parser.warnings)
         navigation.append(f'<a href="#{identifier}">{title}</a>')
-        content.append(f'<section class="chapter" id="{identifier}"><h2>{title}</h2>{fragment}</section>')
+        content.append(f'<section class="chapter" id="{identifier}" data-annotatable="true"><h2>{title}</h2>{fragment}</section>')
+    if (identifiers | reserved_ids) & figure_ids:
+        raise ValueError("Figure IDs must not collide with section/interface IDs.")
     mode = data.get("mode", "deep")
     if mode not in ("quick", "deep", "focused"):
         raise ValueError("mode must be quick, deep, or focused.")
@@ -107,8 +117,20 @@ def build(source, strict=False):
         replacements = {key.upper(): data[key] for key in ("title", "paper_id", "version")}
         replacements["SOURCE_URL"] = source_label
         notes = re.sub(r"\{\{([A-Z_]+)\}\}", lambda match: replacements.get(match.group(1), match.group(0)), notes)
+    annotation_path = root / "annotations.json"
+    annotation_raw = annotation_path.read_text(encoding="utf-8") if annotation_path.exists() else None
+    annotations = (json.loads(annotation_raw) if annotation_raw is not None else {
+        "schema_version": 1, "paper_id": data["paper_id"], "version": data["version"],
+        "revision": None, "updated_at": None, "annotations": []})
+    validate_annotations(annotations, data["paper_id"], data["version"])
+    annotation_snapshot = annotation_raw if annotation_raw is not None else json.dumps(annotations, ensure_ascii=False, indent=2) + "\n"
+    discussion_path = root / "discussion.md"
+    discussion = discussion_path.read_text(encoding="utf-8") if discussion_path.exists() else ""
     seed = {"paperId": data["paper_id"], "version": data["version"], "notes": notes,
-            "notesHash": hashlib.sha256(notes.encode("utf-8")).hexdigest(), "ui": ui}
+            "notesHash": hashlib.sha256(notes.encode("utf-8")).hexdigest(), "ui": ui,
+            "annotations": annotations, "annotationFile": annotation_snapshot,
+            "sectionRevisions": revisions, "sourceUrl": source_url,
+            "discussion": discussion, "replies": discussion_replies(discussion), "sources": sources}
     substitutions = {
         "TITLE": html.escape(data["title"]), "VERSION": html.escape(data["version"]),
         "SOURCE_LINK": (f'<a href="{html.escape(source_url, quote=True)}" target="_blank" rel="noopener">{html.escape(ui["read_source"])}</a>'
@@ -116,18 +138,23 @@ def build(source, strict=False):
         "LANGUAGE": html.escape(data.get("language", "en"), quote=True),
         "SUMMARY": html.escape(data["summary"]), "NAV": "\n".join(navigation),
         "CONTENT": "\n".join(content),
+        "ANNOTATION_SCRIPT": (SKILL_DIR / "assets/annotations.js").read_text(encoding="utf-8"),
+        "NOTEBOOK_SCRIPT": (SKILL_DIR / "assets/notebook.js").read_text(encoding="utf-8"),
         "SEED": json.dumps(seed, ensure_ascii=True).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"),
     }
     substitutions.update({"UI_" + key.upper(): html.escape(value, quote=True) for key, value in ui.items()})
-    template = (SKILL_DIR / "assets/notebook-template.html").read_text(encoding="utf-8")
     notebook = re.sub(r"\{\{([A-Z_]+)\}\}", lambda match: substitutions[match.group(1)], template)
     output = root / "notebook.html"
     if not notes_path.exists():
         with notes_path.open("x", encoding="utf-8") as file:
             file.write(notes)
+    if annotation_raw is None:
+        with annotation_path.open("x", encoding="utf-8") as file:
+            file.write(annotation_snapshot)
     output.write_text(notebook, encoding="utf-8")
     sources_path.write_text(json.dumps(sources, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    return {"notebook": str(output), "notes": str(notes_path), "sections": len(sections), "warnings": list(dict.fromkeys(warnings))}
+    return {"notebook": str(output), "notes": str(notes_path), "annotations": str(annotation_path),
+            "sections": len(sections), "warnings": list(dict.fromkeys(warnings))}
 
 
 def main():
