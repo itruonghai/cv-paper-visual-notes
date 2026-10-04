@@ -149,7 +149,7 @@
   // shift stored anchors; the original section DOM and figure pixels stay intact.
   function textNodes(section) {
     const walker = document.createTreeWalker(section, NodeFilter.SHOW_TEXT, {acceptNode(node) {
-      return node.parentElement.closest('button,script,style,[data-capture-ui]') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+      return node.parentElement.closest('button,script,style,[data-capture-ui],.katex-mathml') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
     }});
     const nodes = []; while (walker.nextNode()) nodes.push(walker.currentNode); return nodes;
   }

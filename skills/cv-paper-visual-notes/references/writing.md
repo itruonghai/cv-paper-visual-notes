@@ -2,11 +2,36 @@
 
 ## Write for understanding
 
+Default to **balanced, STE-inspired English**. Take useful principles from ASD-STE100: familiar verbs, consistent terminology, direct sentence structure, and explicit actors. The reader's “60–70%” preference means moderate use of these principles, not a numerical compliance target. Do not claim formal conformance: the full standard includes controlled vocabulary and writing rules, and this skill does not audit against its dictionary. See the [official overview](https://www.asd-ste100.org/) and [FAQ](https://www.asd-ste100.org/faq.html).
+
+### Reader-controlled language, independent of technical depth
+
+Save the chosen `writing_profile` in `paper.json` when authoring/revising a notebook. Follow an explicit reader instruction first, then the existing setting; default to `balanced`. The builder validates this setting but does not rewrite prose. It guides the authoring agent on future turns.
+
+| Profile | How to write |
+|---|---|
+| `balanced` (default) | Clear sentences, defined technical terms, intuition followed by exact operations. Keep necessary mathematical detail and caveats. |
+| `guided` | Use more intermediate explanation and smaller reasoning steps. Restate a difficult sentence in familiar language and connect it to the original terminology/equation. |
+| `compact` | Assume familiarity with ML/CV terms and reduce repeated explanation. Keep direct syntax and the same scientific qualifications. |
+
+These profiles control language, not expertise assumptions about the reader's intelligence or the amount of evidence. The existing `quick`/`deep`/`focused` mode controls scope. “Make the wording simpler” is not permission to remove equations, ablations, assumptions, or the actual design.
+
+Use one main claim per sentence when it helps. Prefer an explicit subject (“the scorer ranks the candidates”) and use the same term for the same concept. Expand dense noun phrases into actions. Avoid arbitrary word limits, a strict approved-word whitelist, and mechanical bans on passive voice or *-ing* forms. A slightly longer sentence can preserve a useful condition better than several disconnected fragments.
+
+Keep the paper's technical names, operators, variable meanings, dimensions, and distinctions such as frozen/trainable, conditional/marginal, and training/inference. Define a term before replacing it with a shorthand. Preserve quantifiers, comparison settings, causal direction, and words such as “may,” “under this assumption,” and “on the tested datasets.” Do not turn a measured association into a universal explanation.
+
+Illustrative wording example (not a claim about a particular paper):
+
+> During training, only the adapter is updated. The backbone stays frozen. An auxiliary consistency loss helps train the adapter. The auxiliary branch is removed at inference.
+
+This wording retains the training stage, updated parameters, objective, and inference change. A description such as “a small module improves the model” would lose the design. When simplifying a real paragraph, check its final wording against the source for the mechanism, conditions, and evidence that matter.
+
 Use clear, concrete language that makes the idea and design intention easy to follow. Explain each important choice in this order: **the problem → the intuition → the actual operation → why it may help → the supporting evidence**. State the intuitive explanation before introducing notation or implementation detail.
 
 - Use short, connected sentences with one main idea at a time. Prefer concrete descriptions of what information moves or changes over abstract phrases such as “improves feature interaction.”
 - Define a necessary technical term or acronym at first use. Keep the paper's exact component names, then explain what each component does in ordinary language so the reader can match text to the original figure.
 - Introduce equations by the question they answer, explain the symbols and relevant dimensions, and describe the operation and its effect. Do not expect the formula alone to explain the mechanism.
+- Keep short variables and expressions inline. Use a display equation for long objectives, stacked fractions, matrices, cases, or aligned derivations. Explain the displayed expression immediately below it. Follow [math-rendering.md](math-rendering.md) for actual rendering and checks; backticks show code and must not stand in for typeset math.
 - Make the reason for each design choice explicit. Distinguish the authors' stated intention from the agent's inferred rationale; explain what would differ under the earlier approach.
 - Keep the overview approachable and put derivations or secondary detail in expandable blocks. Clear language must retain technical conditions, uncertainty, and meaningful differences between methods.
 

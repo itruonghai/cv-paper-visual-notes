@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Build an offline visual notebook from trusted, locally authored paper.json.
 
-Uses only the Python standard library. Preserves any existing notes.md verbatim.
+Plain HTML uses Python's standard library. TeX uses Node and bundled KaTeX;
+optional Markdown input uses markdown-it-py. Existing notes are preserved.
 Section HTML is authored by the agent; this is not an untrusted HTML sanitizer.
 """
 import argparse
@@ -19,13 +20,14 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from notebook_html import NotebookHTML
 from annotation_data import validate_annotations, discussion_replies
+from math_rendering import MathRenderer
 
 
 def embed_images(fragment, root):
     return NotebookHTML(root, math_mode="warn").finish(fragment)
 
 
-def build(source, strict=False):
+def build(source, strict=False, node=None):
     source = source.resolve(strict=True)
     root = source.parent
     data = json.loads(source.read_text(encoding="utf-8"))
@@ -43,6 +45,10 @@ def build(source, strict=False):
     math_mode = data.get("math_mode", "auto")
     if math_mode not in ("auto", "warn"):
         raise ValueError("math_mode must be auto or warn.")
+    writing_profile = data.get("writing_profile", "balanced")
+    if writing_profile not in ("balanced", "guided", "compact"):
+        raise ValueError("writing_profile must be balanced, guided, or compact; it controls prose, not technical depth.")
+    renderer = MathRenderer(math_mode, node=node, macros=data.get("math_macros"))
     image_paths = set()
     identifiers = set()
     template = (SKILL_DIR / "assets/notebook-template.html").read_text(encoding="utf-8")
@@ -55,8 +61,11 @@ def build(source, strict=False):
             raise ValueError(f"Section ID must be unique and lowercase hyphenated: {identifier}")
         identifiers.add(identifier)
         title = html.escape(section["title"])
-        parser = NotebookHTML(root, math_mode=math_mode, section_id=identifier)
-        fragment = parser.finish(section["html"])
+        if ("html" in section) == ("markdown" in section):
+            raise ValueError("Each section needs exactly one of html or markdown.")
+        authored = section["html"] if "html" in section else renderer.markdown(section["markdown"])
+        parser = NotebookHTML(root, math_mode=math_mode, section_id=identifier, math_renderer=renderer)
+        fragment = parser.finish(authored)
         if figure_ids & parser.figure_ids:
             raise ValueError("Figure IDs must be unique across the notebook.")
         figure_ids.update(parser.figure_ids)
@@ -138,6 +147,7 @@ def build(source, strict=False):
         "LANGUAGE": html.escape(data.get("language", "en"), quote=True),
         "SUMMARY": html.escape(data["summary"]), "NAV": "\n".join(navigation),
         "CONTENT": "\n".join(content),
+        "MATH_STYLES": renderer.css(),
         "ANNOTATION_SCRIPT": (SKILL_DIR / "assets/annotations.js").read_text(encoding="utf-8"),
         "NOTEBOOK_SCRIPT": (SKILL_DIR / "assets/notebook.js").read_text(encoding="utf-8"),
         "SEED": json.dumps(seed, ensure_ascii=True).replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"),
@@ -161,9 +171,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("paper_json", type=Path)
     parser.add_argument("--strict", action="store_true", help="Fail before writing when lint warnings remain")
+    parser.add_argument("--node", help="Node executable for bundled offline KaTeX; overrides CV_NOTEBOOK_NODE, runtime.local.json, and PATH")
     args = parser.parse_args()
     try:
-        result = build(args.paper_json, strict=args.strict)
+        result = build(args.paper_json, strict=args.strict, node=args.node)
         for warning in result["warnings"]:
             print("Warning: " + warning, file=sys.stderr)
         print(json.dumps(result))

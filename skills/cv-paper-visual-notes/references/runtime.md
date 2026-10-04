@@ -4,9 +4,9 @@ Resolve the skill directory from the absolute location of the SKILL.md you loade
 
 ## Choose a runtime once
 
-Python **3.9 or newer** is supported. `build_notebook.py` uses the standard library, with optional `latex2mathml` for equation conversion. Figure extraction needs **Pillow** and either **PyMuPDF** or Poppler's **pdftoppm**. Caption location needs **pdftotext** from Poppler. Do not assume system Python includes these packages.
+Python **3.9 or newer** is supported. `build_notebook.py` uses the standard library for plain HTML. TeX needs an existing Node.js executable and the bundled offline KaTeX renderer. Optional `section.markdown` input needs `markdown-it-py` in the chosen Python. Figure extraction needs **Pillow** and either **PyMuPDF** or Poppler's **pdftoppm**. Caption location needs **pdftotext** from Poppler. Do not assume system Python includes these packages.
 
-If `runtime.local.json` exists beside SKILL.md, read its `python`, `node`, `playwright`, `browser`, and `library_root` hints and verify the referenced executables exist. These are local hints, not portable dependencies or permission grants. Otherwise inspect available runtimes or use the host's bundled dependency locator. Before capture, check the chosen interpreter:
+If `runtime.local.json` exists beside SKILL.md, read its `python`, `node`, `playwright`, `browser`, and `library_root` hints and verify the referenced executables exist. These are local hints, not portable dependencies or permission grants. The math builder reads the `node` hint itself; agents resolve the other hints before invoking helpers. Otherwise inspect available runtimes or use the host's bundled dependency locator. Before capture, check the chosen interpreter:
 
 ```bash
 /absolute/path/to/python -c 'import sys, PIL, shutil; print(sys.version); print(shutil.which("pdftoppm"))'
@@ -43,7 +43,9 @@ Warnings identify missing comparison/limitations sections, missing caption/sourc
 
 Figure provenance is merged from used image sidecars into `sources.json`. Existing records and custom fields are preserved. Original web image/SVG assets can use explicit `sources.json` entries instead of synthetic PDF sidecars. Check provenance content as well as file presence.
 
-By default the builder converts delimited LaTeX in prose to MathML **if `latex2mathml` is installed in the selected interpreter**; otherwise it warns. `math_mode: warn` leaves math untouched for inspection. Code blocks and existing MathML are not converted. This is a convenience for supported LaTeX, not a full TeX compiler. Check output against the paper; use an original equation crop for unsupported macros, ambiguous parsing, or a failed conversion. Do not claim that accessing LaTeX source alone makes equations accurate.
+For equations, follow [math-rendering.md](math-rendering.md). The default `math_mode: auto` typesets TeX with bundled KaTeX at build time, including offline fonts and accessible MathML. It needs Node.js but no globally installed packages. Pass `--node /absolute/path/to/node` if needed. `CV_NOTEBOOK_NODE`, local `runtime.local.json`'s `node` hint, and PATH are fallback locations, in that order. Missing renderers or invalid equations stop before replacing the notebook. `math_mode: warn` is a deliberate diagnostic mode; it leaves equations unrendered and should not be used for the final reading copy.
+
+Use `math_macros` for definitions checked against the paper. Do not assume a whole LaTeX preamble or all packages are supported. Preserve the mathematics when repairing syntax, and use an original equation crop for unsupported source notation. A `section.markdown` field explicitly enables math-aware Markdown parsing; `section.html` is already-authored HTML. Each section uses exactly one format.
 
 ## Localize one paper
 

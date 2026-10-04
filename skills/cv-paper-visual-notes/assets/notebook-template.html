@@ -4,7 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{TITLE}} · {{UI_PAGE_SUFFIX}}</title>
+{{MATH_STYLES}}
 <style>
+.paper-math{overflow-wrap:normal;word-break:normal}.paper-math .katex{font-size:1.05em}
+.paper-math-inline{display:inline-block;white-space:nowrap}.paper-math-display{display:block;max-width:100%;overflow-x:auto;overflow-y:hidden;padding:.45em .15em;margin:.4em 0}
+.paper-math-display .katex-display{margin:.35em 0}.paper-math-display .katex-display>.katex{white-space:nowrap}
 .table-scroll table{min-width:560px;overflow-wrap:normal}
 .table-scroll .comparison-table{min-width:820px;table-layout:fixed}
 .comparison-table th:first-child{width:20%}
@@ -34,10 +38,11 @@
 .figure-comment{margin-top:10px;font-size:13px}
 .print-only{display:none}.print-text{white-space:pre-wrap;overflow-wrap:anywhere;font:inherit}
 ::highlight(cv-highlight){background:#ffe6a0;color:#172c38}::highlight(cv-comment){background:#ffe6a0;color:#172c38;text-decoration:underline dotted #9a6a00 2px}::highlight(cv-key){background:#c9ecd9;color:#0f3d33;text-decoration:underline #176354 2px}::highlight(cv-pending){background:#cfe0f5;color:#172c38}::highlight(cv-active){background:#b8dfd2;color:#172c38}
-@media(max-width:1200px){.layout{grid-template-columns:160px minmax(0,1fr)}.capture-panel{grid-column:2;position:static;max-height:none}}
+@media(max-width:1600px){.layout{grid-template-columns:160px minmax(0,1fr)}.capture-panel{grid-column:2;position:static;max-height:none}}
 @media(max-width:800px){.layout{grid-template-columns:1fr;gap:12px}.capture-panel{grid-column:1}#capture-selection{max-width:90vw;bottom:12px}}
 @media(max-width:640px){#capture-popover{position:fixed;left:8px!important;right:8px;top:auto!important;bottom:8px;width:auto;max-height:70vh;overflow:auto}}
 @media print{.layout{display:block}#capture-panel,#capture-selection,#capture-toast,#capture-popover,#capture-menu,.figure-comment,#notes-editor,.no-print{display:none!important}.print-only{display:block}.print-text{max-height:none;overflow:visible}.discussion-text{max-height:none;overflow:visible}details{display:block}}
+@media print{.table-scroll{overflow:visible}.table-scroll table,.table-scroll .comparison-table{min-width:0;table-layout:fixed}.table-scroll th,.table-scroll td{overflow-wrap:anywhere}.comparison-table figure{padding:6px}}
 </style>
 </head>
 <body>

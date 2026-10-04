@@ -16,6 +16,18 @@ const [notebook,outdir,playwrightPath,browserPath]=process.argv.slice(2);
     page.setDefaultTimeout(8000);
     const errors=[];page.on('pageerror',error=>errors.push(String(error)));
     await page.goto(pathToFileURL(notebook).href,{timeout:10000,waitUntil:'load'});
+    await page.evaluate(()=>document.fonts.ready);
+    const math=page.locator('[data-annotatable] .paper-math');
+    if(await page.locator('.katex-error').count())throw new Error('An equation contains a rendering error');
+    async function checkInlineMath(){
+      const oversized=await page.locator('[data-annotatable] .paper-math-inline').evaluateAll(els=>els.filter(el=>{
+        const math=el.querySelector('.katex'),font=parseFloat(getComputedStyle(el).fontSize);
+        return math && (math.getClientRects().length>1 || math.getBoundingClientRect().height>font*2.8 || math.getBoundingClientRect().width>el.parentElement.clientWidth+1);
+      }).map(el=>el.dataset.latex));
+      if(oversized.length)throw new Error('Move oversized inline equations to display math: '+oversized.join('; '));
+    }
+    await checkInlineMath();
+    await page.addStyleTag({content:'html{scroll-behavior:auto!important}'});
     const figures=page.locator('figure img');
     for(let i=0;i<await figures.count();i++){
       await figures.nth(i).evaluate(async img=>{await img.decode();if(!img.naturalWidth)throw new Error('Unreadable figure');});
@@ -78,9 +90,10 @@ const [notebook,outdir,playwrightPath,browserPath]=process.argv.slice(2);
     await page.evaluate(()=>window.dispatchEvent(new Event('afterprint')));
     if(JSON.stringify(disclosures)!==JSON.stringify(await page.locator('[data-annotatable] details').evaluateAll(els=>els.map(el=>el.open))))throw new Error('Print changed disclosure states');
     await page.setViewportSize({width:390,height:844});
+    await checkInlineMath();
     if(!await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1))throw new Error('Page overflows the mobile viewport');
     await page.screenshot({path:path.join(outdir,'mobile.png'),fullPage:true,timeout:10000});
     if(errors.length)throw new Error(errors.join('\n'));
-    console.log(JSON.stringify({status:'passed',figures:await figures.count(),screenshots:outdir,visual_review:'Inspect screenshots separately; this does not prove scientific fidelity.'}));
+    console.log(JSON.stringify({status:'passed',figures:await figures.count(),equations:await math.count(),screenshots:outdir,visual_review:'Inspect screenshots separately; this does not prove scientific fidelity.'}));
   } finally {await browser.close();}
 })().catch(error=>{console.error(String(error));process.exitCode=1;});

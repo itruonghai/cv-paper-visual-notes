@@ -63,9 +63,11 @@ Create `paper.json` as UTF-8 JSON with these fields:
 - `title`, `version`: exact source metadata.
 - `source_url`: HTTP(S) primary-source URL when available. For an uploaded PDF without a public URL, omit it and provide `source_label` describing the supplied file; record the local file identity in `sources.json`.
 - `language`: optional document language code, default `en`. Supply per-paper `ui_strings` using keys from `assets/ui-strings.json`; never edit the shared template just to translate one paper. Optional `notes_seed` translates the initial blank notes file without changing existing notes.
+- `writing_profile`: `balanced` (default), `guided`, or `compact`; controls authoring style while preserving technical content. See writing.md.
+- `math_macros`: optional verified command-to-expansion mapping for the paper; see math-rendering.md.
 - `mode`: `deep` (default), `quick`, or `focused`. Quick/deep retain comparison and limitations sections; focused covers a deliberately narrow request.
 - `summary`: a compact motivation → design → evidence explanation in plain text.
-- `sections`: a list of objects with a unique lowercase hyphenated `id`, `title`, and `html`. Set optional `kind` to `comparison` or `limitations` for those sections if custom IDs are used.
+- `sections`: a list of objects with a unique lowercase hyphenated `id`, `title`, and exactly one of `html` or `markdown`. Set optional `kind` to `comparison` or `limitations` for those sections if custom IDs are used.
 
 The `html` is an agent-authored fragment using paragraphs, figures, tables, lists, and `<details><summary>…</summary>…</details>` for technical depth. Do not paste arbitrary publisher HTML or scripts. The builder is for trusted locally authored content, not an HTML sanitizer. Use semantic markup and descriptive alt text. Keep tables in `<div class="table-scroll">` wrappers. Use `<div class="callout">` for an evidence qualification or a clearly labeled inference.
 
@@ -80,7 +82,7 @@ Use relative image paths beneath the paper folder. The builder embeds PNG/JPEG/W
 </figure>
 ```
 
-Replace example values with verified metadata; examples are not paper facts. Figure enlargement is built in. Keep the original unannotated image available whenever adding a separate annotated version. For important math, use legible HTML/MathML or an original equation crop plus a variable explanation. The optional latex2mathml path and lint warnings are explained in [runtime.md](runtime.md); inspect converted equations against the source.
+Replace example values with verified metadata; examples are not paper facts. Figure enlargement is built in. Keep the original unannotated image available whenever adding a separate annotated version. For important math, use legible HTML/MathML or an original equation crop plus a variable explanation. The offline KaTeX path, explicit Markdown input, and equation checks are explained in [math-rendering.md](math-rendering.md); inspect converted equations against the source.
 
 For an agent-created explanatory diagram, save a separate asset such as `assets/workflow-explained.svg` and use the same figure markup and enlargement. Its visible caption must say “Agent-created explanatory diagram,” cite the paper passages/figures it interprets, and explain any simplifications or inferred connections. Add a `sources.json` figure record with the relative `file`, `kind: "agent-created-explanation"`, source locations, and any assumptions; do not give it an original-PDF-crop identity. Keep the original source figure nearby. Use self-contained SVG/HTML or pre-rendered Mermaid without an external runtime. Check the rendered diagram's arrows and labels against its cited evidence.
 

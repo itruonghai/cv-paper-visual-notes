@@ -5,6 +5,8 @@ Understand a computer vision paper through its **original figures**, a clear tec
 The skill creates a portable HTML reading notebook with:
 
 - Motivation, limitations of prior methods, novelty, and the actual method design.
+- Balanced, STE-inspired English with adjustable language profiles and preserved technical depth.
+- Offline LaTeX rendering with bundled KaTeX/fonts, plus optional math-aware Markdown sections.
 - Insights from official project pages, supplementary material, and accessible author explanation/demo videos, with source links and timestamps.
 - Original figures captured from the PDF at **200 DPI by default**, with higher resolution when needed.
 - **Side-by-side comparisons** of the target and relevant prior methods.
@@ -79,10 +81,11 @@ Installation itself uses only Python's standard library. Reading papers and capt
 
 | Task | Dependency |
 |---|---|
-| Build the notebook | Python 3.9+ |
+| Build plain HTML sections | Python 3.9+ |
+| Render TeX equations | Existing Node.js; KaTeX and fonts are bundled |
+| Author sections in Markdown | markdown-it-py (included in requirements.txt) |
 | Capture PDF pages/crops | Pillow plus Poppler `pdftoppm` or PyMuPDF |
 | Locate caption candidates | Poppler `pdftotext` |
-| Convert supported LaTeX to MathML | Optional `latex2mathml` |
 | Check layout, enlargement, and notes export | Optional Node.js, Playwright, and Chrome/Chromium |
 
 Use existing compatible runtimes if available. Otherwise, an isolated Python environment is convenient:
@@ -91,7 +94,6 @@ Use existing compatible runtimes if available. Otherwise, an isolated Python env
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
-python -m pip install latex2mathml  # optional equation conversion
 ```
 
 On macOS with Homebrew, install Poppler with `brew install poppler`. On other systems, use your package manager. PyMuPDF (`python -m pip install pymupdf`) is an alternative page renderer; caption location still needs Poppler.
@@ -105,7 +107,7 @@ Tell the agent to use the absolute path to your chosen Python. You can save loca
 }
 ```
 
-These are placeholders: replace them with your actual paths. Optional `node`, `playwright`, and `browser` keys point to an existing Node executable, Playwright module directory, and browser executable. The agent reads these hints; the helpers do not automatically load them. See [the runtime guide](skills/cv-paper-visual-notes/references/runtime.md) for bounded browser checks and exact helper commands.
+These are placeholders: replace them with your actual paths. Optional `node`, `playwright`, and `browser` keys point to an existing Node executable, Playwright module directory, and browser executable. The agent reads these hints; the math builder also reads the local `node` hint. It can be overridden with `--node` or `CV_NOTEBOOK_NODE`. See [the runtime guide](skills/cv-paper-visual-notes/references/runtime.md) for bounded browser checks and exact helper commands.
 
 Use the same `library_root` for both agents to continue the same paper notebook. No existing papers are moved automatically.
 
@@ -123,7 +125,9 @@ The training workflow is unclear. Add an explanatory diagram alongside the origi
 Continue from /path/to/paper-folder and discuss the questions in notes.md.
 ```
 
-`deep` is the default full walkthrough. `quick` gives a shorter daily read. A focused request such as explaining one figure stays focused. Output language follows the conversation unless you specify another.
+`deep` is the default full walkthrough. `quick` gives a shorter daily read. A focused request such as explaining one figure stays focused. Output language follows the conversation unless you specify another. `writing_profile: balanced` is the default: familiar wording and direct sentences with the full mechanism, notation, conditions, and evidence preserved. Use `guided` for more explanation or `compact` for less repetition. These are STE-inspired preferences, not ASD-STE100 compliance scores. See [writing guidance](skills/cv-paper-visual-notes/references/writing.md).
+
+Short equations stay inline; long equations use display layout. The builder typesets them once with embedded fonts, so reading works offline. It fails clearly on unsupported math instead of quietly leaving raw LaTeX. Sections can use `html` or `markdown`; see [the rendering guide](skills/cv-paper-visual-notes/references/math-rendering.md).
 
 Each paper folder contains:
 
@@ -183,5 +187,14 @@ node tests/check_annotations_browser.cjs work/capture-check work/capture-check/r
 ```
 
 The suite stops after 48 seconds and uses temporary profiles and mocked folder access. It checks captures, source identity, imports, two-tab edits, linked replies, save conflicts/failures, and printing. Inspect its desktop/mobile screenshots. If Poppler's `pdftotext` is available, it also verifies the generated PDF contains the final technical/note markers and excludes recovery text. Native folder-picker interaction remains browser-dependent.
+
+Check equation rendering with a separate fixture:
+
+```bash
+python3 tests/create_math_fixture.py work/math-check
+node tests/check_math_browser.cjs work/math-check/notebook.html work/math-check/results /absolute/path/to/node_modules/playwright /absolute/path/to/chrome
+```
+
+This check runs offline and covers inline wrapping, embedded math fonts, highlights across equations, mobile layout, and printed equations and comparison tables. Inspect its desktop/mobile screenshots and PDF as well.
 
 The repository contains the skill and its helpers. Downloaded papers, extracted figures, reading notes, and local runtime configuration belong in your own workspace/library.

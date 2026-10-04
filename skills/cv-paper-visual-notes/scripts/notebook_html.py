@@ -5,20 +5,21 @@ import hashlib
 from html.parser import HTMLParser
 import re
 from urllib.parse import unquote, urlparse
+from math_rendering import MathRenderer, protect_math
 
 IMAGE_MIMES = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
                ".webp": "image/webp", ".svg": "image/svg+xml"}
-MATH = re.compile(r"(?<!\\)(\$\$[\s\S]+?\$\$|\\\[[\s\S]+?\\\]|\\\([\s\S]+?\\\)|\$[^$\n]+?\$)")
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
 
 
 class NotebookHTML(HTMLParser):
-    def __init__(self, root, math_mode="auto", section_id="section"):
+    def __init__(self, root, math_mode="auto", section_id="section", math_renderer=None):
         super().__init__(convert_charrefs=False)
         self.root = root.resolve()
         self.output, self.images, self.warnings, self.figures, self.stack = [], [], [], [], []
         self.pending_text = []
         self.math_mode = math_mode
+        self.math_renderer = math_renderer or MathRenderer(math_mode)
         self.section_id = section_id
         self.figure_ids = set()
 
@@ -107,29 +108,7 @@ class NotebookHTML(HTMLParser):
             return
         if self.figures and "figcaption" in self.stack and text.strip():
             self.figures[-1]["text"] = True
-        if any(tag in self.stack for tag in ("code", "pre", "script", "style", "math")):
-            self.output.append(text)
-            return
-
-        def convert(match):
-            token = match.group(0)
-            display = token.startswith(("$$", "\\["))
-            expression = token[2:-2] if token.startswith(("$$", "\\[", "\\(")) else token[1:-1]
-            # Avoid treating ordinary currency prose such as "$5 and $10" as math.
-            if token.startswith("$") and not display and re.fullmatch(r"\d[\d,.]*\s+[A-Za-z\s]+", expression):
-                return token
-            if self.math_mode == "auto":
-                try:
-                    from latex2mathml.converter import convert as to_mathml
-                    return to_mathml(html.unescape(expression), display="block" if display else "inline")
-                except ImportError:
-                    pass
-                except Exception as error:
-                    self.warn(f"Math conversion failed ({type(error).__name__}); inspect this equation.")
-            self.warn("Unrendered LaTeX remains. Use an equation crop, MathML, or optional latex2mathml in this Python runtime.")
-            return token
-
-        self.output.append(MATH.sub(convert, text))
+        self.output.append(text)
 
     def handle_entityref(self, name):
         self.pending_text.append("&" + name + ";")
@@ -146,12 +125,16 @@ class NotebookHTML(HTMLParser):
         self.output.append("<!" + decl + ">")
 
     def finish(self, fragment):
-        self.feed(fragment)
+        protected, slots, warnings = protect_math(fragment)
+        self.feed(protected)
         self.close()
         self.flush_text()
         if self.figures:
             self.warn("Unclosed figure element; inspect the section HTML.")
-        return "".join(self.output)
+        result = self.math_renderer.restore("".join(self.output), slots, warnings)
+        for warning in self.math_renderer.warnings:
+            self.warn(warning)
+        return result
 
 
 def json_list(values):
